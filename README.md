@@ -1,1 +1,170 @@
+# CuratedStack
 
+A blog and affiliate tool-curation site for digital builders and makers, built with
+Next.js 15 (App Router), TypeScript, Tailwind CSS, Prisma, PostgreSQL, and Auth.js.
+
+## Tech stack
+
+- **Next.js 15** (App Router, Server Actions)
+- **TypeScript**
+- **Tailwind CSS**
+- **Prisma ORM** + **PostgreSQL**
+- **Auth.js (NextAuth v5)** — Credentials provider, JWT sessions
+- **React Hook Form** + **Zod** for form validation
+- **Lucide** icons
+
+## Features
+
+- Public site: Home, Blog, individual blog posts, The Stack, About, Contact,
+  Privacy Policy, Terms of Service
+- Responsive nav with a mobile hamburger menu
+- Database-driven footer with social links that auto-hide when empty
+- Blog: rich HTML content, live word count + reading time, affiliate
+  disclosure banner, native Web Share API with clipboard fallback
+- The Stack: database-driven tool cards (name, slug, description, category,
+  affiliate URL, logo, featured/visible flags)
+- Contact page: mailto link, working contact form (Server Action), and a note
+  that replies take a few days
+- Full admin panel at `/admin`:
+  - `/admin/login` — Credentials-based login
+  - `/admin/dashboard` — post/tool stat cards
+  - `/admin/posts` — create, edit, delete, draft/publish, preview
+  - `/admin/tools` — create, edit, delete, show/hide, feature
+  - `/admin/footer` — manage social links (auto-hidden when blank)
+  - `/admin/settings` — site title, logo, favicon, default SEO, analytics ID
+- Route protection via `middleware.ts` (redirects unauthenticated users away
+  from `/admin/*` except the login page)
+
+## Getting started
+
+### 1. Prerequisites
+
+- Node.js 18.18+ (20 LTS recommended)
+- A PostgreSQL database (local, Docker, or a hosted provider like Neon,
+  Supabase, or Railway)
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure environment variables
+
+Copy the example file and fill in your own values:
+
+```bash
+cp .env.example .env
+```
+
+- `DATABASE_URL` — your PostgreSQL connection string
+- `AUTH_SECRET` — generate with `npx auth secret` or `openssl rand -base64 32`
+- `NEXTAUTH_URL` — `http://localhost:3000` in development
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD` — credentials the seed script uses to
+  create your first admin user
+
+### 4. Set up the database
+
+Push the Prisma schema to your database:
+
+```bash
+npm run db:push
+```
+
+(Use `npm run db:migrate` instead if you prefer tracked migrations.)
+
+### 5. Seed the database
+
+This creates an admin user, one category, 3 blog posts (2 published, 1
+draft), and 7 stack tools (Notion, Beehiiv, ConvertKit, Framer, Webflow,
+Lemon Squeezy, Amazon Associates) with placeholder affiliate URLs.
+
+```bash
+npm run db:seed
+```
+
+### 6. Run the dev server
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000` for the public site and
+`http://localhost:3000/admin/login` for the admin panel (use the
+`ADMIN_EMAIL` / `ADMIN_PASSWORD` you set in `.env`).
+
+## Project structure
+
+```
+curated-stack/
+├── prisma/
+│   ├── schema.prisma        # User, Post, Category, Tool, Footer, Settings, Media, ActivityLog
+│   └── seed.ts              # Seeds admin user, posts, tools, footer, settings
+├── src/
+│   ├── auth.ts              # Auth.js config (Credentials provider, Prisma adapter)
+│   ├── auth.config.ts       # Edge-safe auth config used by middleware
+│   ├── middleware.ts        # Protects /admin/* routes
+│   ├── app/
+│   │   ├── layout.tsx       # Root layout (Header + Footer + metadata)
+│   │   ├── page.tsx         # Home
+│   │   ├── blog/
+│   │   │   ├── page.tsx     # Blog listing
+│   │   │   └── [slug]/page.tsx
+│   │   ├── stack/page.tsx   # The Stack
+│   │   ├── about/page.tsx
+│   │   ├── contact/
+│   │   │   ├── page.tsx
+│   │   │   └── actions.ts   # Contact form Server Action
+│   │   ├── privacy/page.tsx
+│   │   ├── terms/page.tsx
+│   │   ├── api/auth/[...nextauth]/route.ts
+│   │   └── admin/
+│   │       ├── login/       # Public login page
+│   │       ├── actions.ts   # Shared CRUD + auth Server Actions
+│   │       └── (protected)/ # Route group requiring auth
+│   │           ├── layout.tsx    # Sidebar + session check
+│   │           ├── dashboard/
+│   │           ├── posts/
+│   │           ├── tools/
+│   │           ├── footer/
+│   │           └── settings/
+│   ├── components/          # Header, Footer, Hero, BlogCard, ToolCard, etc.
+│   │   └── admin/           # PostForm, ToolForm, FooterForm, SettingsForm
+│   ├── lib/                 # prisma client, validations (Zod), utils
+│   └── types/
+├── package.json
+├── tailwind.config.ts
+├── tsconfig.json
+└── .env.example
+```
+
+## Data model summary
+
+| Model       | Purpose                                             |
+|-------------|------------------------------------------------------|
+| `User`      | Admin/editor accounts (Auth.js Credentials provider) |
+| `Post`      | Blog posts (draft/published, SEO fields, reading time) |
+| `Category`  | Blog post categories                                |
+| `Tool`      | Stack tools (affiliate URL, category, featured/visible) |
+| `Footer`    | Singleton row for social links                      |
+| `Settings`  | Singleton row for site-wide settings                |
+| `Media`     | Uploaded media references (extend with a storage provider) |
+| `ActivityLog` | Audit trail of admin actions                      |
+
+`Account`, `Session`, and `VerificationToken` are the standard Auth.js
+adapter models required by `@auth/prisma-adapter`.
+
+## Notes & next steps
+
+- The contact form and newsletter signup are wired up end-to-end but log to
+  the server console — connect `submitContactForm` (in
+  `src/app/contact/actions.ts`) to an email provider (Resend, Postmark,
+  SMTP), and connect `Newsletter.tsx` to your ESP of choice (Beehiiv,
+  ConvertKit, etc.).
+- All affiliate URLs are seeded as `https://example.com?ref=curatedstack`
+  placeholders — replace them with real affiliate links from the admin
+  Tools editor.
+- Image uploads aren't wired to a storage provider; featured images and
+  logos currently take a direct URL. Add an upload endpoint (e.g. S3,
+  Cloudinary, Vercel Blob) and use the `Media` model to track uploads if
+  you need file uploads from the admin panel.
